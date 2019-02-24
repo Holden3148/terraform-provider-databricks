@@ -3,10 +3,10 @@ package databricks
 import (
 	"errors"
 	"fmt"
-	"github.com/betabandido/databricks-sdk-go/client"
-	"github.com/betabandido/databricks-sdk-go/models"
+	"github.com/cattail/databricks-sdk-go/databricks"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
+	"net/http"
 	"testing"
 )
 
@@ -63,11 +63,9 @@ func testAccCheckDatabricksClusterExists(n string) resource.TestCheckFunc {
 			return fmt.Errorf("no ID is set")
 		}
 
-		conn := testAccProvider.Meta().(*Client).clusters
+		client := testAccProvider.Meta().(*databricks.APIClient)
 
-		_, err := conn.Get(&models.ClustersGetRequest{
-			ClusterId: rs.Primary.ID,
-		})
+		_, _, err := client.ClusterApi.GetCluster(nil, rs.Primary.ID)
 		if err != nil {
 			return nil
 		}
@@ -77,19 +75,16 @@ func testAccCheckDatabricksClusterExists(n string) resource.TestCheckFunc {
 }
 
 func testAccCheckDatabricksClusterDestroy(s *terraform.State) error {
-	endpoint := testAccProvider.Meta().(*Client).clusters
+	client := testAccProvider.Meta().(*databricks.APIClient)
 
 	clusterId := s.RootModule().Resources["databricks_cluster.cluster"].Primary.ID
 
-	_, err := endpoint.Get(&models.ClustersGetRequest{
-		ClusterId: clusterId,
-	})
-
+	_, httpResponse, err := client.ClusterApi.GetCluster(nil, clusterId)
 	if err == nil {
 		return errors.New("cluster still exists")
 	}
 
-	if !resourceDatabricksClusterNotExistsError(err) {
+	if !resourceDatabricksClusterNotExistsError(httpResponse) {
 		return err
 	}
 
@@ -123,17 +118,11 @@ resource "databricks_cluster" "cluster" {
 }
 
 func TestDatabricksCluster_handlesNonExistingClusterError(t *testing.T) {
-	if resourceDatabricksClusterNotExistsError(errors.New("an error")) {
+	if resourceDatabricksClusterNotExistsError(&http.Response{StatusCode: 300}) {
 		t.Fatal("An error was incorrectly classified as non-existing-cluster error")
 	}
 
-	if !resourceDatabricksClusterNotExistsError(client.NewError(
-		models.ErrorResponse{
-			ErrorCode: "INVALID_PARAMETER_VALUE",
-			Message:   "Cluster foobar does not exist",
-		},
-		400,
-	)) {
+	if !resourceDatabricksClusterNotExistsError(&http.Response{StatusCode: 400}) {
 		t.Fatal("A non-existing-cluster error was not detected")
 	}
 }

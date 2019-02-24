@@ -1,6 +1,7 @@
 package databricks
 
 import (
+	"github.com/cattail/databricks-sdk-go/databricks"
 	"github.com/hashicorp/terraform/helper/schema"
 )
 
@@ -9,33 +10,24 @@ func Provider() *schema.Provider {
 		Schema: map[string]*schema.Schema{
 			"domain": {
 				Type:     schema.TypeString,
-				Optional: true,
+				Required: true,
 			},
 			"token": {
 				Type:     schema.TypeString,
-				Optional: true,
+				Required: true,
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
-			"databricks_cluster":  resourceDatabricksCluster(),
-			"databricks_notebook": resourceDatabricksNotebook(),
+			"databricks_cluster": resourceDatabricksCluster(),
 		},
 		ConfigureFunc: providerConfigure,
 	}
 }
 
 func providerConfigure(d *schema.ResourceData) (interface{}, error) {
-	config := Config{}
-
-	if domain, ok := d.GetOk("domain"); ok {
-		s := domain.(string)
-		config.Domain = &s
-	}
-
-	if token, ok := d.GetOk("token"); ok {
-		s := token.(string)
-		config.Token = &s
-	}
-
-	return config.Client()
+	cfg := databricks.NewConfiguration()
+	cfg.AddDefaultHeader("Authorization", "Bearer "+d.Get("token").(string))
+	cfg.BasePath = d.Get("domain").(string) + "/api/2.0"
+	client := databricks.NewAPIClient(cfg)
+	return &client, nil
 }
