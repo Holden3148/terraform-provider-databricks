@@ -2,6 +2,10 @@
   name = "github.com/hashicorp/terraform"
   version = "0.10.8"
 
+[[constraint]]
+  name = "github.com/cattail/databricks-sdk-go"
+  branch = "master"
+
 [prune]
   go-tests = true
   unused-packages = true

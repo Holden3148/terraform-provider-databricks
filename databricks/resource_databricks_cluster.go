@@ -3,6 +3,7 @@ package databricks
 import (
 	"github.com/cattail/databricks-sdk-go/databricks"
 	"github.com/hashicorp/terraform/helper/schema"
+	"github.com/hashicorp/terraform/helper/validation"
 	"log"
 	"net/http"
 	"time"
@@ -16,25 +17,13 @@ func resourceDatabricksCluster() *schema.Resource {
 		Delete: resourceDatabricksClusterDelete,
 
 		Schema: map[string]*schema.Schema{
-			"name": {
-				Type:     schema.TypeString,
-				Optional: true,
-			},
-			"spark_version": {
-				Type:     schema.TypeString,
-				Required: true,
-			},
-			"node_type_id": {
-				Type:     schema.TypeString,
-				Required: true,
-			},
 			"num_workers": {
 				Type:          schema.TypeInt,
 				Optional:      true,
 				ConflictsWith: []string{"autoscale"},
 			},
 			"autoscale": {
-				Type:     schema.TypeSet,
+				Type:     schema.TypeList,
 				Optional: true,
 				MaxItems: 1,
 				Elem: &schema.Resource{
@@ -51,12 +40,21 @@ func resourceDatabricksCluster() *schema.Resource {
 				},
 				ConflictsWith: []string{"num_workers"},
 			},
-			"autotermination_minutes": {
-				Type:     schema.TypeInt,
+			"cluster_name": {
+				Type:     schema.TypeString,
 				Optional: true,
 			},
+			"spark_version": {
+				Type:     schema.TypeString,
+				Required: true,
+			},
+			"spark_conf": {
+				Type:     schema.TypeMap,
+				Optional: true,
+				Elem:     &schema.Schema{Type: schema.TypeString},
+			},
 			"aws_attributes": {
-				Type:     schema.TypeSet,
+				Type:     schema.TypeList,
 				Optional: true,
 				MaxItems: 1,
 				Elem: &schema.Resource{
@@ -72,6 +70,10 @@ func resourceDatabricksCluster() *schema.Resource {
 						"ebs_volume_type": {
 							Type:     schema.TypeString,
 							Optional: true,
+							ValidateFunc: validation.StringInSlice([]string{
+								string(databricks.GENERAL_PURPOSE_SSD_ClustersEbsVolumeType),
+								string(databricks.THROUGHPUT_OPTIMIZED_HDD_ClustersEbsVolumeType),
+							}, true),
 						},
 						"ebs_volume_count": {
 							Type:     schema.TypeInt,
@@ -83,6 +85,80 @@ func resourceDatabricksCluster() *schema.Resource {
 						},
 					},
 				},
+			},
+			"node_type_id": {
+				Type:     schema.TypeString,
+				Required: true,
+			},
+			"driver_node_type_id": {
+				Type:     schema.TypeString,
+				Optional: true,
+			},
+			"ssh_public_keys": {
+				Type:     schema.TypeList,
+				Optional: true,
+				Elem:     &schema.Schema{Type: schema.TypeString},
+			},
+			"custom_tags": {
+				Type:     schema.TypeMap,
+				Optional: true,
+				Elem:     &schema.Schema{Type: schema.TypeString},
+			},
+			"cluster_log_conf": {
+				Type:     schema.TypeList,
+				Optional: true,
+				MaxItems: 1,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"dbfs": {
+							Type:     schema.TypeList,
+							Optional: true,
+							MaxItems: 1,
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"destination": {
+										Type:     schema.TypeString,
+										Required: true,
+									},
+								},
+							},
+						},
+						"s3": {
+							Type:     schema.TypeList,
+							Optional: true,
+							MaxItems: 1,
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"destination": {
+										Type:     schema.TypeString,
+										Required: true,
+									},
+									"region": {
+										Type:     schema.TypeString,
+										Optional: true,
+									},
+									"endpoint": {
+										Type:     schema.TypeString,
+										Optional: true,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			"spark_env_vars": {
+				Type:     schema.TypeMap,
+				Optional: true,
+				Elem:     &schema.Schema{Type: schema.TypeString},
+			},
+			"autotermination_minutes": {
+				Type:     schema.TypeInt,
+				Optional: true,
+			},
+			"enable_elastic_disk": {
+				Type:     schema.TypeBool,
+				Optional: true,
 			},
 		},
 	}
@@ -98,26 +174,55 @@ func resourceDatabricksClusterCreate(d *schema.ResourceData, m interface{}) erro
 		NodeTypeId:   d.Get("node_type_id").(string),
 	}
 
-	if v, ok := d.GetOk("name"); ok {
-		request.ClusterName = v.(string)
-	}
-
 	if v, ok := d.GetOk("num_workers"); ok {
 		request.NumWorkers = int32(v.(int))
 	}
 
 	if v, ok := d.GetOk("autoscale"); ok {
-		autoscale := resourceDatabricksClusterExpandAutoscale(v.(*schema.Set).List())
+		autoscale := resourceDatabricksClusterExpandAutoscale(v.([]interface{}))
 		request.Autoscale = &autoscale
+	}
+
+	if v, ok := d.GetOk("cluster_name"); ok {
+		request.ClusterName = v.(string)
+	}
+
+	if v, ok := d.GetOk("spark_conf"); ok {
+		request.SparkConf = toMapString(v)
+	}
+
+	if v, ok := d.GetOk("aws_attributes"); ok {
+		awsAttributes := resourceDatabricksClusterExpandAwsAttributes(v.([]interface{}))
+		request.AwsAttributes = &awsAttributes
+	}
+
+	if v, ok := d.GetOk("driver_node_type_id"); ok {
+		request.DriverNodeTypeId = v.(string)
+	}
+
+	if v, ok := d.GetOk("ssh_public_keys"); ok {
+		request.SshPublicKeys = toSliceString(v)
+	}
+
+	if v, ok := d.GetOk("custom_tags"); ok {
+		request.CustomTags = toMapString(v)
+	}
+
+	if v, ok := d.GetOk("cluster_log_conf"); ok {
+		clusterLogConf := resourceDatabricksClusterExpandClusterLogConf(v.([]interface{}))
+		request.ClusterLogConf = &clusterLogConf
+	}
+
+	if v, ok := d.GetOk("spark_env_vars"); ok {
+		request.SparkEnvVars = toMapString(v)
 	}
 
 	if v, ok := d.GetOk("autotermination_minutes"); ok {
 		request.AutoterminationMinutes = int32(v.(int))
 	}
 
-	if v, ok := d.GetOk("aws_attributes"); ok {
-		awsAttributes := resourceDatabricksClusterExpandAwsAttributes(v.(*schema.Set).List())
-		request.AwsAttributes = &awsAttributes
+	if v, ok := d.GetOk("enable_elastic_disk"); ok {
+		request.EnableElasticDisk = v.(bool)
 	}
 
 	resp, _, err := client.CreateCluster(nil, request)
@@ -155,22 +260,50 @@ func resourceDatabricksClusterUpdate(d *schema.ResourceData, m interface{}) erro
 	}
 
 	if v, ok := d.GetOk("autoscale"); ok {
-		autoscale := resourceDatabricksClusterExpandAutoscale(v.(*schema.Set).List())
+		autoscale := resourceDatabricksClusterExpandAutoscale(v.([]interface{}))
 		request.Autoscale = &autoscale
 	}
 
-	if v, ok := d.GetOk("name"); ok {
+	if v, ok := d.GetOk("cluster_name"); ok {
 		request.ClusterName = v.(string)
+	}
+
+	if v, ok := d.GetOk("spark_conf"); ok {
+		request.SparkConf = toMapString(v)
+	}
+
+	if v, ok := d.GetOk("aws_attributes"); ok {
+		awsAttributes := resourceDatabricksClusterExpandAwsAttributes(v.([]interface{}))
+		request.AwsAttributes = &awsAttributes
+	}
+
+	if v, ok := d.GetOk("driver_node_type_id"); ok {
+		request.DriverNodeTypeId = v.(string)
+	}
+
+	if v, ok := d.GetOk("ssh_public_keys"); ok {
+		request.SshPublicKeys = toSliceString(v)
+	}
+
+	if v, ok := d.GetOk("custom_tags"); ok {
+		request.CustomTags = toMapString(v)
+	}
+
+	if v, ok := d.GetOk("cluster_log_conf"); ok {
+		clusterLogConf := resourceDatabricksClusterExpandClusterLogConf(v.([]interface{}))
+		request.ClusterLogConf = &clusterLogConf
+	}
+
+	if v, ok := d.GetOk("spark_env_vars"); ok {
+		request.SparkEnvVars = toMapString(v)
 	}
 
 	if v, ok := d.GetOk("autotermination_minutes"); ok {
 		request.AutoterminationMinutes = int32(v.(int))
 	}
 
-	if v, ok := d.GetOk("aws_attributes"); ok {
-		value := v.(*schema.Set).List()
-		awsAttributes := resourceDatabricksClusterExpandAwsAttributes(value)
-		request.AwsAttributes = &awsAttributes
+	if v, ok := d.GetOk("enable_elastic_disk"); ok {
+		request.EnableElasticDisk = v.(bool)
 	}
 
 	_, err := client.EditCluster(nil, request)
@@ -211,11 +344,6 @@ func resourceDatabricksClusterRead(d *schema.ResourceData, m interface{}) error 
 		return err
 	}
 
-	err = d.Set("name", resp.ClusterName)
-	if err != nil {
-		return err
-	}
-
 	err = d.Set("spark_version", resp.SparkVersion)
 	if err != nil {
 		return err
@@ -236,12 +364,52 @@ func resourceDatabricksClusterRead(d *schema.ResourceData, m interface{}) error 
 		return err
 	}
 
-	err = d.Set("autotermination_minutes", resp.AutoterminationMinutes)
+	err = d.Set("cluster_name", resp.ClusterName)
+	if err != nil {
+		return err
+	}
+
+	err = d.Set("spark_conf", resp.SparkConf)
 	if err != nil {
 		return err
 	}
 
 	err = d.Set("aws_attributes", resourceDatabricksClusterFlattenAwsAttributes(resp.AwsAttributes))
+	if err != nil {
+		return err
+	}
+
+	err = d.Set("driver_node_type_id", resp.DriverNodeTypeId)
+	if err != nil {
+		return err
+	}
+
+	err = d.Set("ssh_public_keys", resp.SshPublicKeys)
+	if err != nil {
+		return err
+	}
+
+	err = d.Set("custom_tags", resp.CustomTags)
+	if err != nil {
+		return err
+	}
+
+	err = d.Set("cluster_log_conf", resourceDatabricksClusterFlattenClusterLogConf(resp.ClusterLogConf))
+	if err != nil {
+		return err
+	}
+
+	err = d.Set("spark_env_vars", resp.SparkEnvVars)
+	if err != nil {
+		return err
+	}
+
+	err = d.Set("autotermination_minutes", resp.AutoterminationMinutes)
+	if err != nil {
+		return err
+	}
+
+	err = d.Set("enable_elastic_disk", resp.EnableElasticDisk)
 	if err != nil {
 		return err
 	}
@@ -303,8 +471,6 @@ func resourceDatabricksClusterExpandAwsAttributes(awsAttributes []interface{}) d
 }
 
 func resourceDatabricksClusterFlattenAwsAttributes(awsAttributes *databricks.ClustersAwsAttributes) []map[string]interface{} {
-	log.Printf("[DEBUG] aws attributes: %s", awsAttributes)
-
 	result := make([]map[string]interface{}, 0)
 	if awsAttributes != nil {
 		attrs := make(map[string]interface{})
@@ -314,6 +480,63 @@ func resourceDatabricksClusterFlattenAwsAttributes(awsAttributes *databricks.Clu
 			attrs["ebs_volume_type"] = string(*awsAttributes.EbsVolumeType)
 			attrs["ebs_volume_count"] = int(awsAttributes.EbsVolumeCount)
 			attrs["ebs_volume_size"] = int(awsAttributes.EbsVolumeSize)
+		}
+
+		result = append(result, attrs)
+	}
+
+	return result
+}
+
+func resourceDatabricksClusterExpandClusterLogConf(clusterLogConf []interface{}) databricks.ClustersClusterLogConf {
+	clusterLogConfElem := clusterLogConf[0].(map[string]interface{})
+
+	result := databricks.ClustersClusterLogConf{}
+
+	if v, ok := clusterLogConfElem["dbfs"]; ok && len(v.([]interface{})) > 0 {
+		clustersClusterLogConfDbfs := databricks.ClustersClusterLogConfDbfs{}
+		clustersClusterLogConfDbfsElem := v.([]interface{})[0].(map[string]interface{})
+		if v, ok := clustersClusterLogConfDbfsElem["destination"]; ok {
+			clustersClusterLogConfDbfs.Destination = v.(string)
+		}
+		result.Dbfs = &clustersClusterLogConfDbfs
+	}
+
+	if v, ok := clusterLogConfElem["s3"]; ok && len(v.([]interface{})) > 0 {
+		clustersClusterLogConfS3 := databricks.ClustersClusterLogConfS3{}
+		clustersClusterLogConfS3Elem := v.([]interface{})[0].(map[string]interface{})
+		if v, ok := clustersClusterLogConfS3Elem["destination"]; ok {
+			clustersClusterLogConfS3.Destination = v.(string)
+		}
+		if v, ok := clustersClusterLogConfS3Elem["region"]; ok {
+			clustersClusterLogConfS3.Region = v.(string)
+		}
+		if v, ok := clustersClusterLogConfS3Elem["endpoint"]; ok {
+			clustersClusterLogConfS3.Endpoint = v.(string)
+		}
+		result.S3 = &clustersClusterLogConfS3
+	}
+
+	return result
+}
+
+func resourceDatabricksClusterFlattenClusterLogConf(clusterLogConf *databricks.ClustersClusterLogConf) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0)
+	if clusterLogConf != nil {
+		attrs := make(map[string]interface{})
+
+		if clusterLogConf.Dbfs != nil {
+			innerAttrs := make(map[string]interface{})
+			innerAttrs["destination"] = clusterLogConf.Dbfs.Destination
+			attrs["dbfs"] = []interface{}{innerAttrs}
+		}
+
+		if clusterLogConf.S3 != nil {
+			innerAttrs := make(map[string]interface{})
+			innerAttrs["destination"] = clusterLogConf.S3.Destination
+			innerAttrs["region"] = clusterLogConf.S3.Region
+			innerAttrs["endpoint"] = clusterLogConf.S3.Endpoint
+			attrs["s3"] = []interface{}{innerAttrs}
 		}
 
 		result = append(result, attrs)
@@ -333,15 +556,23 @@ func waitClusterState(client *databricks.ClusterApiService, clusterId string, st
 	for !find(newStates, *res.State) {
 		res, _, _ = client.GetCluster(nil, clusterId)
 		time.Sleep(5 * time.Second)
-		log.Printf("Waiting cluster enter %s state from %s\n", states, *res.State)
+		log.Printf("[DEBUG] Waiting cluster enter %s state from %s\n", states, *res.State)
 	}
 }
 
-func find(source []interface{}, predict interface{}) bool {
-	for _, v := range source {
-		if v == predict {
-			return true
-		}
+func toMapString(d interface{}) map[string]string {
+	result := make(map[string]string)
+	for k, v := range d.(map[string]interface{}) {
+		result[k] = v.(string)
 	}
-	return false
+	return result
+}
+
+func toSliceString(d interface{}) []string {
+	c := d.([]interface{})
+	result := make([]string, len(c))
+	for i, v := range c {
+		result[i] = v.(string)
+	}
+	return result
 }

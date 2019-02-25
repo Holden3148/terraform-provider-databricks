@@ -2,12 +2,12 @@
 
 
 [[projects]]
-  digest = "1:dc2ba13235a4c8f80a40599575a3f10acb4736cb372f1a68b88333c06564471d"
+  digest = "1:90afd0cfdffcc3df7855160ee2954cbca286e23c4eb9cb3d075536c9e4e1b04f"
   name = "github.com/agext/levenshtein"
   packages = ["."]
   pruneopts = "UT"
-  revision = "5f10fee965225ac1eecdc234c09daf5cd9e7f7b6"
-  version = "v1.2.1"
+  revision = "0ded9c86537917af2ff89bc9c78de6bd58477894"
+  version = "v1.2.2"
 
 [[projects]]
   digest = "1:1929b21a34400d463a99336f8e2908d2a154dc525c52411a8d99bb519942dc4c"
@@ -34,7 +34,7 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:a54a6ca32b4174b89ad88793ef0f56a160a99cec2ebb70e2047a467a32db0981"
+  digest = "1:bce2d8f08ec72abb69b8ddd15a27761edc809f07aee7f73214de2e4cbf47e7d1"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -73,21 +73,8 @@
     "service/sts",
   ]
   pruneopts = "UT"
-  revision = "416a7057457ed9af569ea3682f7319ec3466044d"
-  version = "v1.17.3"
-
-[[projects]]
-  digest = "1:d51ad51e37fc8205abc5676ea96d9e1c17fef1a2fabe4cb5fbec0617bc8ca34f"
-  name = "github.com/betabandido/databricks-sdk-go"
-  packages = [
-    "api/clusters",
-    "api/workspace",
-    "client",
-    "models",
-  ]
-  pruneopts = "UT"
-  revision = "87ddd59a84219434541b2a6300cbc8e36d420550"
-  version = "v0.2"
+  revision = "e8b22c9937cae1fee9bc364a88f3752cc4d1ac2f"
+  version = "v1.17.4"
 
 [[projects]]
   branch = "master"
@@ -114,6 +101,14 @@
   version = "v3.5.1"
 
 [[projects]]
+  branch = "master"
+  digest = "1:dc39615f4a9d6796b169c4c3585ad72c471da2ba059205b1a7acf45a36645709"
+  name = "github.com/cattail/databricks-sdk-go"
+  packages = ["databricks"]
+  pruneopts = "UT"
+  revision = "983ef43eb3d7a68f319064b79a09312ed0d9101d"
+
+[[projects]]
   digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
@@ -128,14 +123,6 @@
   pruneopts = "UT"
   revision = "5b77d2a35fb0ede96d138fc9a99f5c9b6aef11b4"
   version = "v1.7.0"
-
-[[projects]]
-  branch = "master"
-  digest = "1:1ba1d79f2810270045c328ae5d674321db34e3aae468eb4233883b473c5c0467"
-  name = "github.com/golang/glog"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
 
 [[projects]]
   digest = "1:4c0989ca0bcd10799064318923b9bc2db6b4d6338dd75f3f2d86c3511aaaf5cf"
@@ -298,7 +285,7 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:f745ffce72caad14d7e0d2e790927caa6a52249ff89133cecfa0dcccc4d07dec"
+  digest = "1:4855bf1e243cee48d09a562149665ee036b8f2a9cade5243a6d7d858092ffbc1"
   name = "github.com/hashicorp/terraform"
   packages = [
     "config",
@@ -313,6 +300,8 @@
     "helper/logging",
     "helper/resource",
     "helper/schema",
+    "helper/structure",
+    "helper/validation",
     "moduledeps",
     "plugin",
     "plugin/discovery",
@@ -348,12 +337,12 @@
   version = "v0.0.9"
 
 [[projects]]
-  digest = "1:0981502f9816113c9c8c4ac301583841855c8cf4da8c72f696b3ebedf6d0e4e5"
+  digest = "1:b5cf82c3199c040b82e2bb3fbcbcf6771c2759f9c6b839621b0714c822167581"
   name = "github.com/mattn/go-isatty"
   packages = ["."]
   pruneopts = "UT"
-  revision = "6ca4dbf54d38eea1a992b3c722a76a5d1c4cb25c"
-  version = "v0.0.4"
+  revision = "a6dda38a851a575e6799957cdd53ffe0b3fdd90f"
+  version = "v0.0.5"
 
 [[projects]]
   digest = "1:dac0667a3fcdd4102a5da07abeddc89eb2f125b1e91af1ea9544c80eaff19c9a"
@@ -479,7 +468,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:b7b8858de4aba997e54312603676a8f76cedf82e161bf24ada19965d0460dae9"
+  digest = "1:36503a185bc1cb5e186f0d6c55100a22562a376ad263aab2c42b8ffab4e89d17"
   name = "golang.org/x/crypto"
   packages = [
     "bcrypt",
@@ -493,14 +482,15 @@
     "openpgp/s2k",
   ]
   pruneopts = "UT"
-  revision = "a4c6cb3142f211c99e4bf4cd769535b29a9b616f"
+  revision = "ffb98f73852f696ea2bb21a617a5c4b3e067a439"
 
 [[projects]]
   branch = "master"
-  digest = "1:b00cb23f34b0ee30295405da90c7ecbca91930854cff854c9ef9c1e8bfb198e2"
+  digest = "1:5f0e4e86fb2d8bd5952181974e7a5dbc7012ab35c9cb0f33adf3776b2280a543"
   name = "golang.org/x/net"
   packages = [
     "context",
+    "context/ctxhttp",
     "html",
     "html/atom",
     "http/httpguts",
@@ -515,11 +505,22 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:75e12c5cb2efb2da5d7f7054e973f09bd3e28c7da6b76dd7412b8f0151b23605"
+  digest = "1:53bc3c7758c9e20dd5b53c4db7d982fec731443319d98c804794675272950c79"
+  name = "golang.org/x/oauth2"
+  packages = [
+    ".",
+    "internal",
+  ]
+  pruneopts = "UT"
+  revision = "9b3c75971fc92dd27c6436a37c05c831498658f1"
+
+[[projects]]
+  branch = "master"
+  digest = "1:d0e9a312c4610a508569ab25e54d34600b1a96d19b1866ece104ffdf1c1b9d2c"
   name = "golang.org/x/sys"
   packages = ["unix"]
   pruneopts = "UT"
-  revision = "ec7b60b042fd2c54ad5ceaac0c891bd88843f4a2"
+  revision = "cd391775e71e684db52b63df9affd58269495083"
 
 [[projects]]
   digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
@@ -543,6 +544,22 @@
   pruneopts = "UT"
   revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
   version = "v0.3.0"
+
+[[projects]]
+  digest = "1:6f3bd49ddf2e104e52062774d797714371fac1b8bddfd8e124ce78e6b2264a10"
+  name = "google.golang.org/appengine"
+  packages = [
+    "internal",
+    "internal/base",
+    "internal/datastore",
+    "internal/log",
+    "internal/remote_api",
+    "internal/urlfetch",
+    "urlfetch",
+  ]
+  pruneopts = "UT"
+  revision = "e9657d882bb81064595ca3b56cbe2546bbabf7b1"
+  version = "v1.4.0"
 
 [[projects]]
   branch = "master"
@@ -598,12 +615,10 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/betabandido/databricks-sdk-go/api/clusters",
-    "github.com/betabandido/databricks-sdk-go/api/workspace",
-    "github.com/betabandido/databricks-sdk-go/client",
-    "github.com/betabandido/databricks-sdk-go/models",
+    "github.com/cattail/databricks-sdk-go/databricks",
     "github.com/hashicorp/terraform/helper/resource",
     "github.com/hashicorp/terraform/helper/schema",
+    "github.com/hashicorp/terraform/helper/validation",
     "github.com/hashicorp/terraform/plugin",
     "github.com/hashicorp/terraform/terraform",
   ]
