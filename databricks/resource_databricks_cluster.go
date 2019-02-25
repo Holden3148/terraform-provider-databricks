@@ -5,6 +5,7 @@ import (
 	"github.com/hashicorp/terraform/helper/schema"
 	"log"
 	"net/http"
+	"time"
 )
 
 func resourceDatabricksCluster() *schema.Resource {
@@ -128,6 +129,72 @@ func resourceDatabricksClusterCreate(d *schema.ResourceData, m interface{}) erro
 
 	log.Printf("[DEBUG] Cluster ID: %s", d.Id())
 
+	return resourceDatabricksClusterRead(d, m)
+}
+
+func resourceDatabricksClusterUpdate(d *schema.ResourceData, m interface{}) error {
+	client := m.(*databricks.APIClient).ClusterApi
+
+	log.Printf("[DEBUG] Updating cluster: %s", d.Id())
+
+	clusterId := d.Id()
+
+	waitClusterState(client, clusterId, []databricks.ClustersClusterState{
+		databricks.RUNNING_ClustersClusterState,
+		databricks.TERMINATED_ClustersClusterState,
+	})
+
+	request := databricks.ClustersEditRequest{
+		ClusterId:    clusterId,
+		SparkVersion: d.Get("spark_version").(string),
+		NodeTypeId:   d.Get("node_type_id").(string),
+	}
+
+	if v, ok := d.GetOk("num_workers"); ok {
+		request.NumWorkers = int32(v.(int))
+	}
+
+	if v, ok := d.GetOk("autoscale"); ok {
+		autoscale := resourceDatabricksClusterExpandAutoscale(v.(*schema.Set).List())
+		request.Autoscale = &autoscale
+	}
+
+	if v, ok := d.GetOk("name"); ok {
+		request.ClusterName = v.(string)
+	}
+
+	if v, ok := d.GetOk("autotermination_minutes"); ok {
+		request.AutoterminationMinutes = int32(v.(int))
+	}
+
+	if v, ok := d.GetOk("aws_attributes"); ok {
+		value := v.(*schema.Set).List()
+		awsAttributes := resourceDatabricksClusterExpandAwsAttributes(value)
+		request.AwsAttributes = &awsAttributes
+	}
+
+	_, err := client.EditCluster(nil, request)
+	if err != nil {
+		return err
+	}
+
+	return resourceDatabricksClusterRead(d, m)
+}
+
+func resourceDatabricksClusterDelete(d *schema.ResourceData, m interface{}) error {
+	client := m.(*databricks.APIClient).ClusterApi
+
+	log.Printf("[DEBUG] Deleting cluster: %s", d.Id())
+
+	_, err := client.PermanentDeleteCluster(nil, databricks.ClustersPermanentDeleteRequest{
+		ClusterId: d.Id(),
+	})
+	if err != nil {
+		return err
+	}
+
+	d.SetId("")
+
 	return nil
 }
 
@@ -178,61 +245,6 @@ func resourceDatabricksClusterRead(d *schema.ResourceData, m interface{}) error 
 	if err != nil {
 		return err
 	}
-
-	return nil
-}
-
-func resourceDatabricksClusterUpdate(d *schema.ResourceData, m interface{}) error {
-	client := m.(*databricks.APIClient).ClusterApi
-
-	log.Printf("[DEBUG] Updating cluster: %s", d.Id())
-
-	request := databricks.ClustersEditRequest{}
-
-	request.ClusterId = d.Id()
-	request.SparkVersion = d.Get("spark_version").(string)
-	request.NodeTypeId = d.Get("node_type_id").(string)
-
-	if v, ok := d.GetOk("num_workers"); ok {
-		request.NumWorkers = int32(v.(int))
-	}
-
-	if v, ok := d.GetOk("autoscale"); ok {
-		autoscale := resourceDatabricksClusterExpandAutoscale(v.(*schema.Set).List())
-		request.Autoscale = &autoscale
-	}
-
-	if d.HasChange("name") {
-		request.ClusterName = d.Get("name").(string)
-	}
-
-	if d.HasChange("autotermination_minutes") {
-		request.AutoterminationMinutes = int32(d.Get("autotermination_minutes").(int))
-	}
-
-	if d.HasChange("aws_attributes") {
-		value := d.Get("awsAttributes").(*schema.Set).List()
-		awsAttributes := resourceDatabricksClusterExpandAwsAttributes(value)
-		request.AwsAttributes = &awsAttributes
-	}
-
-	_, err := client.EditCluster(nil, request)
-	return err
-}
-
-func resourceDatabricksClusterDelete(d *schema.ResourceData, m interface{}) error {
-	client := m.(*databricks.APIClient).ClusterApi
-
-	log.Printf("[DEBUG] Deleting cluster: %s", d.Id())
-
-	_, err := client.PermanentDeleteCluster(nil, databricks.ClustersPermanentDeleteRequest{
-		ClusterId: d.Id(),
-	})
-	if err != nil {
-		return err
-	}
-
-	d.SetId("")
 
 	return nil
 }
@@ -291,6 +303,8 @@ func resourceDatabricksClusterExpandAwsAttributes(awsAttributes []interface{}) d
 }
 
 func resourceDatabricksClusterFlattenAwsAttributes(awsAttributes *databricks.ClustersAwsAttributes) []map[string]interface{} {
+	log.Printf("[DEBUG] aws attributes: %s", awsAttributes)
+
 	result := make([]map[string]interface{}, 0)
 	if awsAttributes != nil {
 		attrs := make(map[string]interface{})
@@ -306,4 +320,28 @@ func resourceDatabricksClusterFlattenAwsAttributes(awsAttributes *databricks.Clu
 	}
 
 	return result
+}
+
+func waitClusterState(client *databricks.ClusterApiService, clusterId string, states []databricks.ClustersClusterState) {
+	res, _, _ := client.GetCluster(nil, clusterId)
+
+	newStates := make([]interface{}, len(states))
+	for i := range states {
+		newStates[i] = states[i]
+	}
+
+	for !find(newStates, *res.State) {
+		res, _, _ = client.GetCluster(nil, clusterId)
+		time.Sleep(5 * time.Second)
+		log.Printf("Waiting cluster enter %s state from %s\n", states, *res.State)
+	}
+}
+
+func find(source []interface{}, predict interface{}) bool {
+	for _, v := range source {
+		if v == predict {
+			return true
+		}
+	}
+	return false
 }

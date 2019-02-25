@@ -29,5 +29,5 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 	cfg.AddDefaultHeader("Authorization", "Bearer "+d.Get("token").(string))
 	cfg.BasePath = d.Get("domain").(string) + "/api/2.0"
 	client := databricks.NewAPIClient(cfg)
-	return &client, nil
+	return client, nil
 }
