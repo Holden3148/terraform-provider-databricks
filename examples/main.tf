@@ -35,3 +35,7 @@ resource "databricks_cluster" "example-cluster" {
     a = "b"
   }
 }
+
+resource "databricks_job" "example-job" {
+  existing_cluster_id = "0203-091733-bumpy438"
+}

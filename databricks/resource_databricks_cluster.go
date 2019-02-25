@@ -18,9 +18,10 @@ func resourceDatabricksCluster() *schema.Resource {
 
 		Schema: map[string]*schema.Schema{
 			"num_workers": {
-				Type:          schema.TypeInt,
-				Optional:      true,
-				ConflictsWith: []string{"autoscale"},
+				Type:     schema.TypeInt,
+				Optional: true,
+				// FIXME(Chiyu): we can't reuse cluster resource schema in job if we define ConflictsWith here.
+				//ConflictsWith: []string{"autoscale"},
 			},
 			"autoscale": {
 				Type:     schema.TypeList,
@@ -38,7 +39,7 @@ func resourceDatabricksCluster() *schema.Resource {
 						},
 					},
 				},
-				ConflictsWith: []string{"num_workers"},
+				//ConflictsWith: []string{"num_workers"},
 			},
 			"cluster_name": {
 				Type:     schema.TypeString,
@@ -558,21 +559,4 @@ func waitClusterState(client *databricks.ClusterApiService, clusterId string, st
 		time.Sleep(5 * time.Second)
 		log.Printf("[DEBUG] Waiting cluster enter %s state from %s\n", states, *res.State)
 	}
-}
-
-func toMapString(d interface{}) map[string]string {
-	result := make(map[string]string)
-	for k, v := range d.(map[string]interface{}) {
-		result[k] = v.(string)
-	}
-	return result
-}
-
-func toSliceString(d interface{}) []string {
-	c := d.([]interface{})
-	result := make([]string, len(c))
-	for i, v := range c {
-		result[i] = v.(string)
-	}
-	return result
 }
