@@ -101,12 +101,11 @@
   version = "v3.5.1"
 
 [[projects]]
-  branch = "master"
-  digest = "1:dc39615f4a9d6796b169c4c3585ad72c471da2ba059205b1a7acf45a36645709"
+  digest = "1:ca872b109bbcf59997aeca875f0ccf1f663c1cfa8a3ea33d06c8d137864112b5"
   name = "github.com/cattail/databricks-sdk-go"
   packages = ["databricks"]
   pruneopts = "UT"
-  revision = "983ef43eb3d7a68f319064b79a09312ed0d9101d"
+  revision = "221e2c6f93f84291c67e17c48f48a28ebd97ad89"
 
 [[projects]]
   digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"

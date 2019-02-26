@@ -4,7 +4,7 @@
 
 [[constraint]]
   name = "github.com/cattail/databricks-sdk-go"
-  branch = "master"
+  revision = "221e2c6f93f84291c67e17c48f48a28ebd97ad89"
 
 [prune]
   go-tests = true
