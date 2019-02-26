@@ -233,7 +233,12 @@ func resourceDatabricksClusterRead(d *schema.ResourceData, m interface{}) error 
 		return err
 	}
 
-	return setClusterSettings(d, resp)
+	clusterSettings, err := convertClusterInfoToSettings(resp)
+	if err != nil {
+		return err
+	}
+
+	return setClusterSettings(d, *clusterSettings)
 }
 
 func resourceDatabricksClusterNotExistsError(httpResponse *http.Response) bool {
@@ -380,132 +385,132 @@ func waitClusterState(client *databricks.ClusterApiService, clusterId string, st
 }
 
 func getClusterSettings(d interface{}) databricks.NewCluster {
-	request := databricks.NewCluster{
+	clusterSettings := databricks.NewCluster{
 		SparkVersion: get(d, "spark_version").(string),
 		NodeTypeId:   get(d, "node_type_id").(string),
 	}
 
 	if v, ok := getOk(d, "num_workers"); ok {
-		request.NumWorkers = int32(v.(int))
+		clusterSettings.NumWorkers = int32(v.(int))
 	}
 
 	if v, ok := getOk(d, "autoscale"); ok {
 		autoscale := resourceDatabricksClusterExpandAutoscale(v.([]interface{}))
-		request.Autoscale = &autoscale
+		clusterSettings.Autoscale = &autoscale
 	}
 
 	if v, ok := getOk(d, "cluster_name"); ok {
-		request.ClusterName = v.(string)
+		clusterSettings.ClusterName = v.(string)
 	}
 
 	if v, ok := getOk(d, "spark_conf"); ok {
-		request.SparkConf = toMapString(v)
+		clusterSettings.SparkConf = toMapString(v)
 	}
 
 	if v, ok := getOk(d, "aws_attributes"); ok {
 		awsAttributes := resourceDatabricksClusterExpandAwsAttributes(v.([]interface{}))
-		request.AwsAttributes = &awsAttributes
+		clusterSettings.AwsAttributes = &awsAttributes
 	}
 
 	if v, ok := getOk(d, "driver_node_type_id"); ok {
-		request.DriverNodeTypeId = v.(string)
+		clusterSettings.DriverNodeTypeId = v.(string)
 	}
 
 	if v, ok := getOk(d, "ssh_public_keys"); ok {
-		request.SshPublicKeys = toSliceString(v)
+		clusterSettings.SshPublicKeys = toSliceString(v)
 	}
 
 	if v, ok := getOk(d, "custom_tags"); ok {
-		request.CustomTags = toMapString(v)
+		clusterSettings.CustomTags = toMapString(v)
 	}
 
 	if v, ok := getOk(d, "cluster_log_conf"); ok {
 		clusterLogConf := resourceDatabricksClusterExpandClusterLogConf(v.([]interface{}))
-		request.ClusterLogConf = &clusterLogConf
+		clusterSettings.ClusterLogConf = &clusterLogConf
 	}
 
 	if v, ok := getOk(d, "spark_env_vars"); ok {
-		request.SparkEnvVars = toMapString(v)
+		clusterSettings.SparkEnvVars = toMapString(v)
 	}
 
 	if v, ok := getOk(d, "autotermination_minutes"); ok {
-		request.AutoterminationMinutes = int32(v.(int))
+		clusterSettings.AutoterminationMinutes = int32(v.(int))
 	}
 
 	if v, ok := getOk(d, "enable_elastic_disk"); ok {
-		request.EnableElasticDisk = v.(bool)
+		clusterSettings.EnableElasticDisk = v.(bool)
 	}
 
-	return request
+	return clusterSettings
 }
 
-func setClusterSettings(d interface{}, cluster databricks.ClustersClusterInfo) error {
-	err := set(d, "spark_version", cluster.SparkVersion)
+func setClusterSettings(d interface{}, clusterSettings databricks.NewCluster) error {
+	err := set(d, "spark_version", clusterSettings.SparkVersion)
 	if err != nil {
 		return err
 	}
 
-	err = set(d, "node_type_id", cluster.NodeTypeId)
+	err = set(d, "node_type_id", clusterSettings.NodeTypeId)
 	if err != nil {
 		return err
 	}
 
-	err = set(d, "num_workers", cluster.NumWorkers)
+	err = set(d, "num_workers", clusterSettings.NumWorkers)
 	if err != nil {
 		return err
 	}
 
-	err = set(d, "autoscale", resourceDatabricksClusterFlattenAutoscale(cluster.Autoscale))
+	err = set(d, "autoscale", resourceDatabricksClusterFlattenAutoscale(clusterSettings.Autoscale))
 	if err != nil {
 		return err
 	}
 
-	err = set(d, "cluster_name", cluster.ClusterName)
+	err = set(d, "cluster_name", clusterSettings.ClusterName)
 	if err != nil {
 		return err
 	}
 
-	err = set(d, "spark_conf", cluster.SparkConf)
+	err = set(d, "spark_conf", clusterSettings.SparkConf)
 	if err != nil {
 		return err
 	}
 
-	err = set(d, "aws_attributes", resourceDatabricksClusterFlattenAwsAttributes(cluster.AwsAttributes))
+	err = set(d, "aws_attributes", resourceDatabricksClusterFlattenAwsAttributes(clusterSettings.AwsAttributes))
 	if err != nil {
 		return err
 	}
 
-	err = set(d, "driver_node_type_id", cluster.DriverNodeTypeId)
+	err = set(d, "driver_node_type_id", clusterSettings.DriverNodeTypeId)
 	if err != nil {
 		return err
 	}
 
-	err = set(d, "ssh_public_keys", cluster.SshPublicKeys)
+	err = set(d, "ssh_public_keys", clusterSettings.SshPublicKeys)
 	if err != nil {
 		return err
 	}
 
-	err = set(d, "custom_tags", cluster.CustomTags)
+	err = set(d, "custom_tags", clusterSettings.CustomTags)
 	if err != nil {
 		return err
 	}
 
-	err = set(d, "cluster_log_conf", resourceDatabricksClusterFlattenClusterLogConf(cluster.ClusterLogConf))
+	err = set(d, "cluster_log_conf", resourceDatabricksClusterFlattenClusterLogConf(clusterSettings.ClusterLogConf))
 	if err != nil {
 		return err
 	}
 
-	err = set(d, "spark_env_vars", cluster.SparkEnvVars)
+	err = set(d, "spark_env_vars", clusterSettings.SparkEnvVars)
 	if err != nil {
 		return err
 	}
 
-	err = set(d, "autotermination_minutes", cluster.AutoterminationMinutes)
+	err = set(d, "autotermination_minutes", clusterSettings.AutoterminationMinutes)
 	if err != nil {
 		return err
 	}
 
-	err = set(d, "enable_elastic_disk", cluster.EnableElasticDisk)
+	err = set(d, "enable_elastic_disk", clusterSettings.EnableElasticDisk)
 	if err != nil {
 		return err
 	}

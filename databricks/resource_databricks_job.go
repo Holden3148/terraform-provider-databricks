@@ -3,6 +3,7 @@ package databricks
 import (
 	"github.com/cattail/databricks-sdk-go/databricks"
 	"github.com/hashicorp/terraform/helper/schema"
+	"log"
 	"strconv"
 )
 
@@ -257,6 +258,7 @@ func resourceDatabricksJob() *schema.Resource {
 			"max_concurrent_runs": {
 				Type:     schema.TypeInt,
 				Optional: true,
+				Default:  1,
 			},
 		},
 	}
@@ -323,81 +325,185 @@ func resourceDatabricksJobDelete(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceDatabricksJobRead(d *schema.ResourceData, m interface{}) error {
-	return nil
+	client := m.(*databricks.APIClient).JobApi
+
+	jobId, err := strconv.ParseInt(d.Id(), 10, 64)
+	if err != nil {
+		return err
+	}
+
+	resp, httpResponse, err := client.GetJob(nil, jobId)
+	if err != nil {
+		if resourceDatabricksClusterNotExistsError(httpResponse) {
+			log.Printf("[WARN] Job (%s) not found, removing from state", d.Id())
+			d.SetId("")
+			return nil
+		}
+		return err
+	}
+
+	return setJobSettings(d, *resp.Settings)
 }
 
 func getJobSettings(d *schema.ResourceData) databricks.JobSettings {
-	request := databricks.JobSettings{}
+	jobSettings := databricks.JobSettings{}
 
 	if v, ok := d.GetOk("new_cluster"); ok {
 		newCluster := getClusterSettings(v.([]interface{})[0])
-		request.NewCluster = &newCluster
+		jobSettings.NewCluster = &newCluster
 	}
 
 	if v, ok := d.GetOk("existing_cluster_id"); ok {
-		request.ExistingClusterId = v.(string)
+		jobSettings.ExistingClusterId = v.(string)
 	}
 
 	if v, ok := d.GetOk("notebook_task"); ok {
 		notebookTask := resourceDatabricksJobExpandNotebookTask(v.([]interface{}))
-		request.NotebookTask = &notebookTask
+		jobSettings.NotebookTask = &notebookTask
 	}
 
 	if v, ok := d.GetOk("spark_jar_task"); ok {
 		sparkJarTask := resourceDatabricksJobExpandSparkJarTask(v.([]interface{}))
-		request.SparkJarTask = &sparkJarTask
+		jobSettings.SparkJarTask = &sparkJarTask
 	}
 
 	if v, ok := d.GetOk("spark_python_task"); ok {
 		sparkPythonTask := resourceDatabricksJobExpandSparkPythonTask(v.([]interface{}))
-		request.SparkPythonTask = &sparkPythonTask
+		jobSettings.SparkPythonTask = &sparkPythonTask
 	}
 
 	if v, ok := d.GetOk("spark_submit_task"); ok {
 		sparkSubmitTask := resourceDatabricksJobExpandSparkSubmitTask(v.([]interface{}))
-		request.SparkSubmitTask = &sparkSubmitTask
+		jobSettings.SparkSubmitTask = &sparkSubmitTask
 	}
 
 	if v, ok := d.GetOk("name"); ok {
-		request.Name = v.(string)
+		jobSettings.Name = v.(string)
 	}
 
 	if v, ok := d.GetOk("libraries"); ok {
 		libraries := resourceDatabricksJobExpandLibraries(v.([]interface{}))
-		request.Libraries = libraries
+		jobSettings.Libraries = libraries
 	}
 
 	if v, ok := d.GetOk("email_notifications"); ok {
 		emailNotifications := resourceDatabricksJobExpandEmailNotifications(v.([]interface{}))
-		request.EmailNotifications = &emailNotifications
+		jobSettings.EmailNotifications = &emailNotifications
 	}
 
 	if v, ok := d.GetOk("timeout_seconds"); ok {
-		request.TimeoutSeconds = int32(v.(int))
+		jobSettings.TimeoutSeconds = int32(v.(int))
 	}
 
 	if v, ok := d.GetOk("max_retries"); ok {
-		request.MaxRetries = int32(v.(int))
+		jobSettings.MaxRetries = int32(v.(int))
 	}
 
 	if v, ok := d.GetOk("min_retry_interval_millis"); ok {
-		request.MinRetryIntervalMillis = int32(v.(int))
+		jobSettings.MinRetryIntervalMillis = int32(v.(int))
 	}
 
 	if v, ok := d.GetOk("retry_on_timeout"); ok {
-		request.RetryOnTimeout = v.(bool)
+		jobSettings.RetryOnTimeout = v.(bool)
 	}
 
 	if v, ok := d.GetOk("schedule"); ok {
 		schedule := resourceDatabricksJobExpandSchedule(v.([]interface{}))
-		request.Schedule = &schedule
+		jobSettings.Schedule = &schedule
 	}
 
 	if v, ok := d.GetOk("max_concurrent_runs"); ok {
-		request.MaxConcurrentRuns = int32(v.(int))
+		jobSettings.MaxConcurrentRuns = int32(v.(int))
 	}
 
-	return request
+	return jobSettings
+}
+
+func setJobSettings(d interface{}, jobSettings databricks.JobSettings) error {
+	if jobSettings.NewCluster != nil {
+		m := make(map[string]interface{})
+		err := setClusterSettings(m, *jobSettings.NewCluster)
+		if err != nil {
+			return err
+		}
+
+		err = set(d, "new_cluster", []map[string]interface{}{m})
+		if err != nil {
+			return err
+		}
+	}
+
+	err := set(d, "existing_cluster_id", jobSettings.ExistingClusterId)
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "notebook_task", resourceDatabricksJobFlattenNotebookTask(jobSettings.NotebookTask))
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "spark_jar_task", resourceDatabricksJobFlattenSparkJarTask(jobSettings.SparkJarTask))
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "spark_python_task", resourceDatabricksJobFlattenSparkPythonTask(jobSettings.SparkPythonTask))
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "spark_submit_task", resourceDatabricksJobFlattenSparkSubmitTask(jobSettings.SparkSubmitTask))
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "name", jobSettings.Name)
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "libraries", resourceDatabricksJobFlattenLibraries(jobSettings.Libraries))
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "email_notifications", resourceDatabricksJobFlattenEmailNotification(jobSettings.EmailNotifications))
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "timeout_seconds", jobSettings.TimeoutSeconds)
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "max_retries", jobSettings.MaxRetries)
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "min_retry_interval_millis", jobSettings.MinRetryIntervalMillis)
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "retry_on_timeout", jobSettings.RetryOnTimeout)
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "schedule", resourceDatabricksJobFlattenSchedule(jobSettings.Schedule))
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "max_concurrent_runs", jobSettings.MaxConcurrentRuns)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func resourceDatabricksJobExpandNotebookTask(d []interface{}) databricks.NotebookTask {
@@ -411,6 +517,23 @@ func resourceDatabricksJobExpandNotebookTask(d []interface{}) databricks.Noteboo
 
 	if v, ok := getOk(m, "base_parameters"); ok {
 		result.BaseParameters = toSliceMapString(v)
+	}
+
+	return result
+}
+
+func resourceDatabricksJobFlattenNotebookTask(notebookTask *databricks.NotebookTask) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0)
+
+	if notebookTask != nil {
+		item := make(map[string]interface{})
+		item["notebook_path"] = notebookTask.NotebookPath
+		//iBaseParameters := make([]map[string]interface{}, len(notebookTask.BaseParameters))
+		//for i, parameters := range notebookTask.BaseParameters {
+		//	iBaseParameters[i] = parameters.(map[string]interface{})
+		//}
+		item["base_parameters"] = notebookTask.BaseParameters
+		result = append(result, item)
 	}
 
 	return result
@@ -436,6 +559,20 @@ func resourceDatabricksJobExpandSparkJarTask(d []interface{}) databricks.SparkJa
 	return result
 }
 
+func resourceDatabricksJobFlattenSparkJarTask(sparkJarTask *databricks.SparkJarTask) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0)
+
+	if sparkJarTask != nil {
+		item := make(map[string]interface{})
+		item["jar_uri"] = sparkJarTask.JarUri
+		item["main_class_name"] = sparkJarTask.MainClassName
+		item["parameters"] = sparkJarTask.Parameters
+		result = append(result, item)
+	}
+
+	return result
+}
+
 func resourceDatabricksJobExpandSparkPythonTask(d []interface{}) databricks.SparkPythonTask {
 	m := d[0].(map[string]interface{})
 
@@ -452,6 +589,19 @@ func resourceDatabricksJobExpandSparkPythonTask(d []interface{}) databricks.Spar
 	return result
 }
 
+func resourceDatabricksJobFlattenSparkPythonTask(sparkPythonTask *databricks.SparkPythonTask) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0)
+
+	if sparkPythonTask != nil {
+		item := make(map[string]interface{})
+		item["python_file"] = sparkPythonTask.PythonFile
+		item["parameters"] = sparkPythonTask.Parameters
+		result = append(result, item)
+	}
+
+	return result
+}
+
 func resourceDatabricksJobExpandSparkSubmitTask(d []interface{}) databricks.SparkSubmitTask {
 	m := d[0].(map[string]interface{})
 
@@ -459,6 +609,18 @@ func resourceDatabricksJobExpandSparkSubmitTask(d []interface{}) databricks.Spar
 
 	if v, ok := getOk(m, "parameters"); ok {
 		result.Parameters = toSliceString(v)
+	}
+
+	return result
+}
+
+func resourceDatabricksJobFlattenSparkSubmitTask(sparkSubmitTask *databricks.SparkSubmitTask) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0)
+
+	if sparkSubmitTask != nil {
+		item := make(map[string]interface{})
+		item["parameters"] = sparkSubmitTask.Parameters
+		result = append(result, item)
 	}
 
 	return result
@@ -523,6 +685,39 @@ func resourceDatabricksJobExpandLibraries(d []interface{}) []databricks.Library 
 	return libraries
 }
 
+func resourceDatabricksJobFlattenLibraries(libraries []databricks.Library) []map[string]interface{} {
+	result := make([]map[string]interface{}, len(libraries))
+
+	for i, library := range libraries {
+		item := make(map[string]interface{})
+		item["jar"] = library.Jar
+		item["egg"] = library.Egg
+		item["whl"] = library.Whl
+		if library.Pypi != nil {
+			pypi := make(map[string]interface{})
+			pypi["package"] = library.Pypi.Package_
+			pypi["repo"] = library.Pypi.Repo
+			item["pypi"] = []interface{}{pypi}
+		}
+		if library.Maven != nil {
+			maven := make(map[string]interface{})
+			maven["coordinates"] = library.Maven.Coordinates
+			maven["repo"] = library.Maven.Repo
+			maven["exclusions"] = library.Maven.Exclusions
+			item["maven"] = []interface{}{maven}
+		}
+		if library.Cran != nil {
+			cran := make(map[string]interface{})
+			cran["package"] = library.Cran.Package_
+			cran["repo"] = library.Cran.Repo
+			item["pypi"] = []interface{}{cran}
+		}
+		result[i] = item
+	}
+
+	return result
+}
+
 func resourceDatabricksJobExpandEmailNotifications(d []interface{}) databricks.JobEmailNotifications {
 	m := d[0].(map[string]interface{})
 
@@ -547,6 +742,21 @@ func resourceDatabricksJobExpandEmailNotifications(d []interface{}) databricks.J
 	return result
 }
 
+func resourceDatabricksJobFlattenEmailNotification(emailNotification *databricks.JobEmailNotifications) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0)
+
+	if emailNotification != nil {
+		item := make(map[string]interface{})
+		item["on_start"] = emailNotification.OnStart
+		item["on_success"] = emailNotification.OnSuccess
+		item["on_failure"] = emailNotification.OnFailure
+		item["no_alert_for_skipped_runs"] = emailNotification.NoAlertForSkippedRuns
+		result = append(result, item)
+	}
+
+	return result
+}
+
 func resourceDatabricksJobExpandSchedule(d []interface{}) databricks.CronSchedule {
 	m := d[0].(map[string]interface{})
 
@@ -558,6 +768,19 @@ func resourceDatabricksJobExpandSchedule(d []interface{}) databricks.CronSchedul
 
 	if v, ok := getOk(m, "timezone_id"); ok {
 		result.TimezoneId = v.(string)
+	}
+
+	return result
+}
+
+func resourceDatabricksJobFlattenSchedule(schedule *databricks.CronSchedule) []map[string]interface{} {
+	result := make([]map[string]interface{}, 0)
+
+	if schedule != nil {
+		item := make(map[string]interface{})
+		item["quartz_cron_expression"] = schedule.QuartzCronExpression
+		item["timezone_id"] = schedule.TimezoneId
+		result = append(result, item)
 	}
 
 	return result

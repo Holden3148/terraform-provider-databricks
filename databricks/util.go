@@ -2,6 +2,7 @@ package databricks
 
 import (
 	"encoding/json"
+	"github.com/cattail/databricks-sdk-go/databricks"
 	"github.com/hashicorp/terraform/helper/schema"
 	"log"
 	"reflect"
@@ -95,4 +96,20 @@ func logJSON(message string, d interface{}) {
 	}
 
 	log.Printf("%s: %s\n", message, str)
+}
+
+// hack to convert struct NewCluster to struct ClusterInfo
+func convertClusterInfoToSettings(clusterInfo databricks.ClustersClusterInfo) (*databricks.NewCluster, error) {
+	clusterSettings := databricks.NewCluster{}
+
+	bytes, err := json.Marshal(clusterInfo)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(bytes, &clusterSettings)
+	if err != nil {
+		return nil, err
+	}
+
+	return &clusterSettings, nil
 }
