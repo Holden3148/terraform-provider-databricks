@@ -168,7 +168,7 @@ func resourceDatabricksCluster() *schema.Resource {
 func resourceDatabricksClusterCreate(d *schema.ResourceData, m interface{}) error {
 	client := m.(*databricks.APIClient).ClusterApi
 
-	request := getNewCluster(d)
+	request := getClusterSettings(d)
 	logJSON("[DEBUG] Creating cluster", request)
 
 	resp, _, err := client.CreateCluster(nil, request)
@@ -191,7 +191,7 @@ func resourceDatabricksClusterUpdate(d *schema.ResourceData, m interface{}) erro
 		databricks.TERMINATED_ClustersClusterState,
 	})
 
-	request := getNewCluster(d)
+	request := getClusterSettings(d)
 	request.ClusterId = clusterId
 	logJSON("[DEBUG] Updating cluster", request)
 
@@ -233,77 +233,7 @@ func resourceDatabricksClusterRead(d *schema.ResourceData, m interface{}) error 
 		return err
 	}
 
-	err = d.Set("spark_version", resp.SparkVersion)
-	if err != nil {
-		return err
-	}
-
-	err = d.Set("node_type_id", resp.NodeTypeId)
-	if err != nil {
-		return err
-	}
-
-	err = d.Set("num_workers", resp.NumWorkers)
-	if err != nil {
-		return err
-	}
-
-	err = d.Set("autoscale", resourceDatabricksClusterFlattenAutoscale(resp.Autoscale))
-	if err != nil {
-		return err
-	}
-
-	err = d.Set("cluster_name", resp.ClusterName)
-	if err != nil {
-		return err
-	}
-
-	err = d.Set("spark_conf", resp.SparkConf)
-	if err != nil {
-		return err
-	}
-
-	err = d.Set("aws_attributes", resourceDatabricksClusterFlattenAwsAttributes(resp.AwsAttributes))
-	if err != nil {
-		return err
-	}
-
-	err = d.Set("driver_node_type_id", resp.DriverNodeTypeId)
-	if err != nil {
-		return err
-	}
-
-	err = d.Set("ssh_public_keys", resp.SshPublicKeys)
-	if err != nil {
-		return err
-	}
-
-	err = d.Set("custom_tags", resp.CustomTags)
-	if err != nil {
-		return err
-	}
-
-	err = d.Set("cluster_log_conf", resourceDatabricksClusterFlattenClusterLogConf(resp.ClusterLogConf))
-	if err != nil {
-		return err
-	}
-
-	err = d.Set("spark_env_vars", resp.SparkEnvVars)
-	if err != nil {
-		return err
-	}
-
-	err = d.Set("autotermination_minutes", resp.AutoterminationMinutes)
-	if err != nil {
-		return err
-	}
-
-	err = d.Set("enable_elastic_disk", resp.EnableElasticDisk)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return setClusterSettings(d, resp)
 }
 
 func resourceDatabricksClusterNotExistsError(httpResponse *http.Response) bool {
@@ -335,24 +265,24 @@ func resourceDatabricksClusterExpandAwsAttributes(awsAttributes []interface{}) d
 
 	result := databricks.ClustersAwsAttributes{}
 
-	if v, ok := getOK(m, "zone_id"); ok {
+	if v, ok := getOk(m, "zone_id"); ok {
 		result.ZoneId = v.(string)
 	}
 
-	if v, ok := getOK(m, "instance_profile_arn"); ok {
+	if v, ok := getOk(m, "instance_profile_arn"); ok {
 		result.InstanceProfileArn = v.(string)
 	}
 
-	if v, ok := getOK(m, "ebs_volume_type"); ok {
+	if v, ok := getOk(m, "ebs_volume_type"); ok {
 		volumeType := databricks.ClustersEbsVolumeType(v.(string))
 		result.EbsVolumeType = &volumeType
 	}
 
-	if v, ok := getOK(m, "ebs_volume_count"); ok {
+	if v, ok := getOk(m, "ebs_volume_count"); ok {
 		result.EbsVolumeCount = int32(v.(int))
 	}
 
-	if v, ok := getOK(m, "ebs_volume_size"); ok {
+	if v, ok := getOk(m, "ebs_volume_size"); ok {
 		result.EbsVolumeSize = int32(v.(int))
 	}
 
@@ -382,7 +312,7 @@ func resourceDatabricksClusterExpandClusterLogConf(clusterLogConf []interface{})
 
 	result := databricks.ClustersClusterLogConf{}
 
-	if v, ok := getOK(m, "dbfs"); ok {
+	if v, ok := getOk(m, "dbfs"); ok {
 		clustersClusterLogConfDbfs := databricks.ClustersClusterLogConfDbfs{}
 		clustersClusterLogConfDbfsElem := v.([]interface{})[0].(map[string]interface{})
 		if v, ok := clustersClusterLogConfDbfsElem["destination"]; ok {
@@ -391,7 +321,7 @@ func resourceDatabricksClusterExpandClusterLogConf(clusterLogConf []interface{})
 		result.Dbfs = &clustersClusterLogConfDbfs
 	}
 
-	if v, ok := getOK(m, "s3"); ok {
+	if v, ok := getOk(m, "s3"); ok {
 		clustersClusterLogConfS3 := databricks.ClustersClusterLogConfS3{}
 		clustersClusterLogConfS3Elem := v.([]interface{})[0].(map[string]interface{})
 		if v, ok := clustersClusterLogConfS3Elem["destination"]; ok {
@@ -449,62 +379,136 @@ func waitClusterState(client *databricks.ClusterApiService, clusterId string, st
 	}
 }
 
-func getNewCluster(d *schema.ResourceData) databricks.NewCluster {
+func getClusterSettings(d interface{}) databricks.NewCluster {
 	request := databricks.NewCluster{
-		SparkVersion: d.Get("spark_version").(string),
-		NodeTypeId:   d.Get("node_type_id").(string),
+		SparkVersion: get(d, "spark_version").(string),
+		NodeTypeId:   get(d, "node_type_id").(string),
 	}
 
-	if v, ok := d.GetOk("num_workers"); ok {
+	if v, ok := getOk(d, "num_workers"); ok {
 		request.NumWorkers = int32(v.(int))
 	}
 
-	if v, ok := d.GetOk("autoscale"); ok {
+	if v, ok := getOk(d, "autoscale"); ok {
 		autoscale := resourceDatabricksClusterExpandAutoscale(v.([]interface{}))
 		request.Autoscale = &autoscale
 	}
 
-	if v, ok := d.GetOk("cluster_name"); ok {
+	if v, ok := getOk(d, "cluster_name"); ok {
 		request.ClusterName = v.(string)
 	}
 
-	if v, ok := d.GetOk("spark_conf"); ok {
+	if v, ok := getOk(d, "spark_conf"); ok {
 		request.SparkConf = toMapString(v)
 	}
 
-	if v, ok := d.GetOk("aws_attributes"); ok {
+	if v, ok := getOk(d, "aws_attributes"); ok {
 		awsAttributes := resourceDatabricksClusterExpandAwsAttributes(v.([]interface{}))
 		request.AwsAttributes = &awsAttributes
 	}
 
-	if v, ok := d.GetOk("driver_node_type_id"); ok {
+	if v, ok := getOk(d, "driver_node_type_id"); ok {
 		request.DriverNodeTypeId = v.(string)
 	}
 
-	if v, ok := d.GetOk("ssh_public_keys"); ok {
+	if v, ok := getOk(d, "ssh_public_keys"); ok {
 		request.SshPublicKeys = toSliceString(v)
 	}
 
-	if v, ok := d.GetOk("custom_tags"); ok {
+	if v, ok := getOk(d, "custom_tags"); ok {
 		request.CustomTags = toMapString(v)
 	}
 
-	if v, ok := d.GetOk("cluster_log_conf"); ok {
+	if v, ok := getOk(d, "cluster_log_conf"); ok {
 		clusterLogConf := resourceDatabricksClusterExpandClusterLogConf(v.([]interface{}))
 		request.ClusterLogConf = &clusterLogConf
 	}
 
-	if v, ok := d.GetOk("spark_env_vars"); ok {
+	if v, ok := getOk(d, "spark_env_vars"); ok {
 		request.SparkEnvVars = toMapString(v)
 	}
 
-	if v, ok := d.GetOk("autotermination_minutes"); ok {
+	if v, ok := getOk(d, "autotermination_minutes"); ok {
 		request.AutoterminationMinutes = int32(v.(int))
 	}
 
-	if v, ok := d.GetOk("enable_elastic_disk"); ok {
+	if v, ok := getOk(d, "enable_elastic_disk"); ok {
 		request.EnableElasticDisk = v.(bool)
 	}
 
 	return request
+}
+
+func setClusterSettings(d interface{}, cluster databricks.ClustersClusterInfo) error {
+	err := set(d, "spark_version", cluster.SparkVersion)
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "node_type_id", cluster.NodeTypeId)
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "num_workers", cluster.NumWorkers)
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "autoscale", resourceDatabricksClusterFlattenAutoscale(cluster.Autoscale))
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "cluster_name", cluster.ClusterName)
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "spark_conf", cluster.SparkConf)
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "aws_attributes", resourceDatabricksClusterFlattenAwsAttributes(cluster.AwsAttributes))
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "driver_node_type_id", cluster.DriverNodeTypeId)
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "ssh_public_keys", cluster.SshPublicKeys)
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "custom_tags", cluster.CustomTags)
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "cluster_log_conf", resourceDatabricksClusterFlattenClusterLogConf(cluster.ClusterLogConf))
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "spark_env_vars", cluster.SparkEnvVars)
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "autotermination_minutes", cluster.AutoterminationMinutes)
+	if err != nil {
+		return err
+	}
+
+	err = set(d, "enable_elastic_disk", cluster.EnableElasticDisk)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

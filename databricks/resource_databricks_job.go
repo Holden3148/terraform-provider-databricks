@@ -3,7 +3,6 @@ package databricks
 import (
 	"github.com/cattail/databricks-sdk-go/databricks"
 	"github.com/hashicorp/terraform/helper/schema"
-	"log"
 	"strconv"
 )
 
@@ -290,7 +289,7 @@ func resourceDatabricksJobUpdate(d *schema.ResourceData, m interface{}) error {
 	}
 
 	request := databricks.JobsResetRequest{
-		JobId: jobId,
+		JobId:       jobId,
 		NewSettings: &settings,
 	}
 	logJSON("[DEBUG] Updating job", request)
@@ -331,7 +330,7 @@ func getJobSettings(d *schema.ResourceData) databricks.JobSettings {
 	request := databricks.JobSettings{}
 
 	if v, ok := d.GetOk("new_cluster"); ok {
-		newCluster := getJobNewCluster(v.([]interface{}))
+		newCluster := getClusterSettings(v.([]interface{})[0])
 		request.NewCluster = &newCluster
 	}
 
@@ -401,83 +400,18 @@ func getJobSettings(d *schema.ResourceData) databricks.JobSettings {
 	return request
 }
 
-// TODO(Chiyu): getJobNewCluster is almost the same as getNewCluster
-func getJobNewCluster(d []interface{}) databricks.NewCluster {
-	m := d[0].(map[string]interface{})
-
-	request := databricks.NewCluster{
-		SparkVersion: m["spark_version"].(string),
-		NodeTypeId:   m["node_type_id"].(string),
-	}
-
-	if v, ok := getOK(m, "num_workers"); ok {
-		request.NumWorkers = int32(v.(int))
-	}
-
-	if v, ok := getOK(m, "autoscale"); ok {
-		autoscale := resourceDatabricksClusterExpandAutoscale(v.([]interface{}))
-		request.Autoscale = &autoscale
-	}
-
-	if v, ok := getOK(m, "cluster_name"); ok {
-		request.ClusterName = v.(string)
-	}
-
-	if v, ok := getOK(m, "spark_conf"); ok {
-		request.SparkConf = toMapString(v)
-	}
-
-	if v, ok := getOK(m, "aws_attributes"); ok {
-		awsAttributes := resourceDatabricksClusterExpandAwsAttributes(v.([]interface{}))
-		request.AwsAttributes = &awsAttributes
-	}
-
-	if v, ok := getOK(m, "driver_node_type_id"); ok {
-		request.DriverNodeTypeId = v.(string)
-	}
-
-	if v, ok := getOK(m, "ssh_public_keys"); ok {
-		request.SshPublicKeys = toSliceString(v)
-	}
-
-	if v, ok := getOK(m, "custom_tags"); ok {
-		request.CustomTags = toMapString(v)
-	}
-
-	if v, ok := getOK(m, "cluster_log_conf"); ok {
-		clusterLogConf := resourceDatabricksClusterExpandClusterLogConf(v.([]interface{}))
-		request.ClusterLogConf = &clusterLogConf
-	}
-
-	if v, ok := getOK(m, "spark_env_vars"); ok {
-		request.SparkEnvVars = toMapString(v)
-	}
-
-	if v, ok := getOK(m, "autotermination_minutes"); ok {
-		request.AutoterminationMinutes = int32(v.(int))
-	}
-
-	if v, ok := getOK(m, "enable_elastic_disk"); ok {
-		request.EnableElasticDisk = v.(bool)
-	}
-
-	return request
-}
-
 func resourceDatabricksJobExpandNotebookTask(d []interface{}) databricks.NotebookTask {
 	m := d[0].(map[string]interface{})
 
 	result := databricks.NotebookTask{}
 
-	if v, ok := getOK(m, "notebook_path"); ok {
+	if v, ok := getOk(m, "notebook_path"); ok {
 		result.NotebookPath = v.(string)
 	}
 
-	if v, ok := getOK(m, "base_parameters"); ok {
+	if v, ok := getOk(m, "base_parameters"); ok {
 		result.BaseParameters = toSliceMapString(v)
 	}
-
-	log.Println("xxxxx", result.BaseParameters)
 
 	return result
 }
@@ -487,15 +421,15 @@ func resourceDatabricksJobExpandSparkJarTask(d []interface{}) databricks.SparkJa
 
 	result := databricks.SparkJarTask{}
 
-	if v, ok := getOK(m, "jar_uri"); ok {
+	if v, ok := getOk(m, "jar_uri"); ok {
 		result.JarUri = v.(string)
 	}
 
-	if v, ok := getOK(m, "main_class_name"); ok {
+	if v, ok := getOk(m, "main_class_name"); ok {
 		result.MainClassName = v.(string)
 	}
 
-	if v, ok := getOK(m, "parameters"); ok {
+	if v, ok := getOk(m, "parameters"); ok {
 		result.Parameters = toSliceString(v)
 	}
 
@@ -507,11 +441,11 @@ func resourceDatabricksJobExpandSparkPythonTask(d []interface{}) databricks.Spar
 
 	result := databricks.SparkPythonTask{}
 
-	if v, ok := getOK(m, "python_file"); ok {
+	if v, ok := getOk(m, "python_file"); ok {
 		result.PythonFile = v.(string)
 	}
 
-	if v, ok := getOK(m, "parameters"); ok {
+	if v, ok := getOk(m, "parameters"); ok {
 		result.Parameters = toSliceString(v)
 	}
 
@@ -523,7 +457,7 @@ func resourceDatabricksJobExpandSparkSubmitTask(d []interface{}) databricks.Spar
 
 	result := databricks.SparkSubmitTask{}
 
-	if v, ok := getOK(m, "parameters"); ok {
+	if v, ok := getOk(m, "parameters"); ok {
 		result.Parameters = toSliceString(v)
 	}
 
@@ -537,16 +471,16 @@ func resourceDatabricksJobExpandLibraries(d []interface{}) []databricks.Library 
 		m := value.(map[string]interface{})
 		library := databricks.Library{}
 
-		if v, ok := getOK(m, "jar"); ok {
+		if v, ok := getOk(m, "jar"); ok {
 			library.Jar = v.(string)
 		}
-		if v, ok := getOK(m, "egg"); ok {
+		if v, ok := getOk(m, "egg"); ok {
 			library.Egg = v.(string)
 		}
-		if v, ok := getOK(m, "whl"); ok {
+		if v, ok := getOk(m, "whl"); ok {
 			library.Whl = v.(string)
 		}
-		if v, ok := getOK(m, "pypi"); ok {
+		if v, ok := getOk(m, "pypi"); ok {
 			elem := v.([]interface{})[0].(map[string]interface{})
 			pypi := databricks.PythonPyPiLibrary{}
 			if v, ok := elem["package"]; ok {
@@ -557,7 +491,7 @@ func resourceDatabricksJobExpandLibraries(d []interface{}) []databricks.Library 
 			}
 			library.Pypi = &pypi
 		}
-		if v, ok := getOK(m, "maven"); ok {
+		if v, ok := getOk(m, "maven"); ok {
 			elem := v.([]interface{})[0].(map[string]interface{})
 			maven := databricks.MavenLibrary{}
 			if v, ok := elem["coordinates"]; ok {
@@ -571,7 +505,7 @@ func resourceDatabricksJobExpandLibraries(d []interface{}) []databricks.Library 
 			}
 			library.Maven = &maven
 		}
-		if v, ok := getOK(m, "cran"); ok {
+		if v, ok := getOk(m, "cran"); ok {
 			elem := v.([]interface{})[0].(map[string]interface{})
 			cran := databricks.RCranLibrary{}
 			if v, ok := elem["package"]; ok {
@@ -594,19 +528,19 @@ func resourceDatabricksJobExpandEmailNotifications(d []interface{}) databricks.J
 
 	result := databricks.JobEmailNotifications{}
 
-	if v, ok := getOK(m, "on_start"); ok {
+	if v, ok := getOk(m, "on_start"); ok {
 		result.OnStart = toSliceString(v)
 	}
 
-	if v, ok := getOK(m, "on_success"); ok {
+	if v, ok := getOk(m, "on_success"); ok {
 		result.OnSuccess = toSliceString(v)
 	}
 
-	if v, ok := getOK(m, "on_failure"); ok {
+	if v, ok := getOk(m, "on_failure"); ok {
 		result.OnFailure = toSliceString(v)
 	}
 
-	if v, ok := getOK(m, "no_alert_for_skipped_runs"); ok {
+	if v, ok := getOk(m, "no_alert_for_skipped_runs"); ok {
 		result.NoAlertForSkippedRuns = v.(bool)
 	}
 
@@ -618,11 +552,11 @@ func resourceDatabricksJobExpandSchedule(d []interface{}) databricks.CronSchedul
 
 	result := databricks.CronSchedule{}
 
-	if v, ok := getOK(m, "quartz_cron_expression"); ok {
+	if v, ok := getOk(m, "quartz_cron_expression"); ok {
 		result.QuartzCronExpression = v.(string)
 	}
 
-	if v, ok := getOK(m, "timezone_id"); ok {
+	if v, ok := getOk(m, "timezone_id"); ok {
 		result.TimezoneId = v.(string)
 	}
 

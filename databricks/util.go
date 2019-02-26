@@ -2,6 +2,7 @@ package databricks
 
 import (
 	"encoding/json"
+	"github.com/hashicorp/terraform/helper/schema"
 	"log"
 	"reflect"
 )
@@ -41,19 +42,49 @@ func toSliceString(d interface{}) []string {
 	return result
 }
 
+func get(d interface{}, key string) interface{} {
+	switch d.(type) {
+	case *schema.ResourceData:
+		v := d.(*schema.ResourceData)
+		return v.Get(key)
+	default:
+		v := d.(map[string]interface{})[key]
+		return v
+	}
+}
+
 // return ok as true when d is not nil or empty slice
-func getOK(d map[string]interface{}, key string) (interface{}, bool) {
-	v := d[key]
+func getOk(d interface{}, key string) (interface{}, bool) {
+	switch d.(type) {
+	case *schema.ResourceData:
+		v := d.(*schema.ResourceData)
+		return v.GetOk(key)
 
-	if v == nil {
-		return nil, false
+	default:
+		v := d.(map[string]interface{})[key]
+
+		if v == nil {
+			return nil, false
+		}
+
+		if reflect.TypeOf(v).Kind() == reflect.Slice {
+			return v, len(v.([]interface{})) != 0
+		}
+
+		return v, true
 	}
+}
 
-	if reflect.TypeOf(v).Kind() == reflect.Slice {
-		return v, len(v.([]interface{})) != 0
+func set(d interface{}, key string, value interface{}) error {
+	switch d.(type) {
+	case *schema.ResourceData:
+		v := d.(*schema.ResourceData)
+		return v.Set(key, value)
+	default:
+		v := d.(map[string]interface{})
+		v[key] = value
+		return nil
 	}
-
-	return v, true
 }
 
 func logJSON(message string, d interface{}) {
